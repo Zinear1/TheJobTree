@@ -91,7 +91,6 @@ def load_current_user():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Берём города только из тех, что реально есть в БД
             cur.execute(
                 """
                 SELECT DISTINCT TRIM(city) AS city
@@ -173,10 +172,6 @@ def set_city():
         flash("Выберите существующий город из списка.", "error")
     return redirect(request.referrer or url_for("index"))
 
-
-# ============================================================================
-# Главная лента объявлений + фильтры + отдельная сортировка
-# ============================================================================
 @app.route("/")
 def index():
     search_query = request.args.get("q", "").strip()
@@ -282,7 +277,6 @@ def index():
     finally:
         conn.close()
 
-    # Формируем кнопки для отдельного блока сортировки (с сохранением всех фильтров)
     def sort_url(target_sort):
         return url_for(
             "index",
@@ -335,10 +329,6 @@ def index():
         sort_options=sort_options,
     )
 
-
-# ============================================================================
-# Объявления (CRUD), отклики и отзывы по объявлению
-# ============================================================================
 @app.route("/ads/<int:ad_id>")
 def ad_detail(ad_id):
     conn = get_db_connection()
@@ -702,10 +692,6 @@ def delete_ad(ad_id):
         conn.close()
     return redirect(url_for("profile"))
 
-
-# ============================================================================
-# Завершение работы и 5-балльные взаимные отзывы
-# ============================================================================
 @app.route("/ads/<int:ad_id>/complete", methods=["POST"])
 @login_required
 def complete_ad(ad_id):
@@ -731,9 +717,6 @@ def complete_ad(ad_id):
         conn.close()
     return redirect(request.referrer or url_for("ad_detail", ad_id=ad_id))
 
-# ============================================================================
-# Кошелёк: просмотр баланса, пополнение, вывод и история операций
-# ============================================================================
 @app.route("/wallet")
 @login_required
 def wallet():
@@ -913,10 +896,6 @@ def leave_review(ad_id):
 
     return redirect(url_for("ad_detail", ad_id=ad_id))
 
-
-# ============================================================================
-# Отклики, выбор исполнителя (accept_response) и встроенный чат
-# ============================================================================
 @app.route("/ads/<int:ad_id>/respond", methods=["POST"])
 @login_required
 def respond_to_ad(ad_id):
@@ -1271,10 +1250,6 @@ def send_message(chat_id):
 
     return redirect(url_for("chat_detail", chat_id=chat_id))
 
-
-# ============================================================================
-# Авторизация и профиль
-# ============================================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -1335,7 +1310,6 @@ def register():
         conn = get_db_connection()
         try:
             with conn.cursor() as cur:
-                # Проверяем, не заняты ли уже email или телефон
                 cur.execute(
                     "SELECT 1 FROM users WHERE LOWER(email) = %s OR phone = %s LIMIT 1",
                     (email, phone),
@@ -1344,7 +1318,6 @@ def register():
                     flash("Пользователь с таким email или телефоном уже зарегистрирован.", "error")
                     return render_template("auth.html", active_tab="register")
 
-                # Удаляем просроченные заявки и сохраняем новую заявку с кодом на 10 минут
                 cur.execute("DELETE FROM email_verifications WHERE expires_at < CURRENT_TIMESTAMP")
                 cur.execute(
                     """
@@ -1441,7 +1414,6 @@ def verify_email():
                     flash(f"Неверный код. Осталось попыток: {left}.", "error")
                     return redirect(url_for("verify_email"))
 
-                # Код верный — переносим пользователя в основную таблицу users в одной транзакции
                 try:
                     cur.execute(
                         """
@@ -1731,9 +1703,6 @@ def edit_profile():
 
     return redirect(url_for("profile"))
 
-# ============================================================================
-# Админ-панель управления базой данных (CRUD по всем таблицам PostgreSQL)
-# ============================================================================
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "sssloxsss091")
 
 ADMIN_TABLES = {
@@ -1918,7 +1887,7 @@ def _convert_admin_field(field, raw_val, is_edit=False):
     if ftype == "password":
         if not val:
             if is_edit:
-                return None, True  # пропускаем поле при редактировании, чтобы не стереть хеш
+                return None, True 
             raise ValueError(f"Поле «{field['label']}» обязательно.")
         if val.startswith(("scrypt:", "pbkdf2:", "demo_hash_")):
             return val, False
@@ -1990,7 +1959,6 @@ def admin_table(table_name):
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Загрузка списка записей с опциональной фильтрацией по всем столбцам
             order_sql = pg_sql.SQL(", ").join(
                 pg_sql.SQL("{} DESC").format(pg_sql.Identifier(c)) for c in pk_cols
             )
@@ -2014,7 +1982,6 @@ def admin_table(table_name):
                 pk_val = "|".join(str(r[c]) for c in pk_cols)
                 rows.append({"pk": pk_val, "data": r})
 
-            # Если нажали «Изменить» — подгружаем редактируемую строку
             if edit_pk_str:
                 pk_vals = _parse_admin_pk(edit_pk_str, pk_cols)
                 if pk_vals is not None:
@@ -2079,7 +2046,6 @@ def admin_add_row(table_name):
         flash(str(err), "error")
         return redirect(url_for("admin_table", table_name=table_name))
 
-    # Для email_verifications подставим системные значения по умолчанию
     if table_name == "email_verifications":
         cols.extend(["password_hash", "expires_at"])
         vals.extend([generate_password_hash("123456"), datetime.now()])
