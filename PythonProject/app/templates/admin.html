@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель БД — {{ cfg.label }} — TheJobTree{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <div class="admin-head">
+        <div>
+            <span class="badge badge-remote">АДМИНИСТРАТОР БД · PostgreSQL</span>
+            <h1>Управление базой данных</h1>
+            <p class="subtitle">Просмотр, фильтрация, добавление, изменение и удаление записей во всех таблицах.</p>
+        </div>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-danger btn-sm">Выйти из админки</a>
+    </div>
+
+    <!-- Переключатель таблиц БД -->
+    <section class="card admin-tables-bar animate-card">
+        <div class="section-label">ТАБЛИЦЫ БАЗЫ ДАННЫХ ({{ tables|length }})</div>
+        <div class="admin-table-pills">
+            {% for tname, tcfg in tables.items() %}
+                <a href="{{ url_for('admin_table', table_name=tname) }}"
+                   class="sort-pill {% if tname == current_table %}active{% endif %}">
+                    {{ tcfg.label }}
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Фильтрация записей -->
+    <section class="card animate-card">
+        <div class="section-label">ФИЛЬТРАЦИЯ ЗАПИСЕЙ: {{ cfg.label|upper }}</div>
+        <form method="GET" action="{{ url_for('admin_table', table_name=current_table) }}" class="admin-search-row">
+            <input type="text" name="q" value="{{ search_q }}"
+                   placeholder="Поиск по любому полю таблицы (ID, имя, город, статус, текст)...">
+            <button type="submit" class="btn btn-primary">Применить фильтр</button>
+            {% if search_q %}
+                <a href="{{ url_for('admin_table', table_name=current_table) }}" class="btn btn-ghost">Сбросить</a>
+            {% endif %}
+        </form>
+    </section>
+
+    <!-- Форма добавления / редактирования записи -->
+    <section class="card animate-card {% if edit_values %}admin-edit-highlight{% endif %}">
+        <div class="section-label">
+            {% if edit_values %}
+                РЕДАКТИРОВАТЬ ЗАПИСЬ (ID: {{ edit_pk_str }}) — {{ current_table|upper }}
+            {% else %}
+                ДОБАВИТЬ ЗАПИСЬ: {{ current_table|upper }}
+            {% endif %}
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('admin_edit_row', table_name=current_table) if edit_values else url_for('admin_add_row', table_name=current_table) }}"
+              class="form-grid">
+            {% if edit_values %}
+                <input type="hidden" name="orig_pk" value="{{ edit_pk_str }}">
+            {% endif %}
+
+            <div class="admin-form-grid">
+                {% for f in cfg.fields %}
+                    {% set cur_val = edit_values[f.name] if edit_values else '' %}
+                    <label class="{% if f.type == 'textarea' %}span-full{% endif %}">
+                        <span>
+                            {{ f.label }}
+                            {% if f.required and not (edit_values and f.type == 'password') %}*{% endif %}
+                        </span>
+
+                        {% if f.type == 'textarea' %}
+                            <textarea name="{{ f.name }}" rows="2"
+                                      {% if f.required %}required{% endif %}>{{ cur_val }}</textarea>
+
+                        {% elif f.type == 'select' %}
+                            <select name="{{ f.name }}" {% if f.required %}required{% endif %}>
+                                {% for opt in f.options %}
+                                    <option value="{{ opt }}" {% if cur_val == opt %}selected{% endif %}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+
+                        {% elif f.type == 'bool' %}
+                            <select name="{{ f.name }}">
+                                <option value="false" {% if cur_val != 'true' %}selected{% endif %}>false (Нет)</option>
+                                <option value="true" {% if cur_val =='true' %}selected{% endif %}>true (Да)</option>
+                            </select>
+
+                        {% elif f.type == 'date' %}
+                            <input type="date" name="{{ f.name }}" value="{{ cur_val }}">
+
+                        {% elif f.type == 'password' %}
+                            <input type="text" name="{{ f.name }}" value=""
+                                   {% if f.required and not edit_values %}required{% endif %}
+                                   placeholder="{% if edit_values %}Оставьте пустым, чтобы не менять пароль{% else %}Введите пароль{% endif %}">
+
+                        {% else %}
+                            <input type="text"
+                                   inputmode="{% if f.type in ('int', 'decimal') %}decimal{% else %}text{% endif %}"
+                                   name="{{ f.name }}"
+                                   value="{{ cur_val }}"
+                                   {% if f.required %}required{% endif %}
+                                   autocomplete="off">
+                        {% endif %}
+                    </label>
+                {% endfor %}
+            </div>
+
+            <div class="card-actions">
+                <button type="submit" class="btn btn-primary">
+                    {% if edit_values %}Сохранить изменения{% else %}Добавить запись{% endif %}
+                </button>
+                {% if edit_values %}
+                    <a href="{{ url_for('admin_table', table_name=current_table, q=search_q or None) }}" class="btn btn-ghost">
+                        Отменить редактирование
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+
+    <!-- Вывод данных таблицы -->
+    <section class="card animate-card">
+        <div class="section-label">ВЫВОД ДАННЫХ ИЗ БАЗЫ ({{ rows|length }} ЗАП.)</div>
+
+        {% if rows %}
+            <div class="table-scroll">
+                <table class="db-table">
+                    <thead>
+                        <tr>
+                            {% for col in cfg.display_cols %}
+                                <th>{{ col }}</th>
+                            {% endfor %}
+                            <th class="th-actions">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr class="{% if edit_pk_str == row.pk %}row-editing{% endif %}">
+                                {% for col in cfg.display_cols %}
+                                    {% set val = row.data[col] %}
+                                    <td title="{{ val if val is not none else 'NULL' }}">
+                                        {% if val is none %}
+                                            <span class="null-val">NULL</span>
+                                        {% elif val is sameas true %}
+                                            <span class="status-pill status-активно">true</span>
+                                        {% elif val is sameas false %}
+                                            <span class="status-pill status-выполнено">false</span>
+                                        {% elif val.__class__.__name__ == 'datetime' %}
+                                            {{ val.strftime('%d.%m.%Y %H:%M') }}
+                                        {% elif val.__class__.__name__ == 'date' %}
+                                            {{ val.strftime('%d.%m.%Y') }}
+                                        {% else %}
+                                            {% set s = val|string %}
+                                            {{ s[:65] }}{% if s|length > 65 %}…{% endif %}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                                <td class="td-actions">
+                                    <a href="{{ url_for('admin_table', table_name=current_table, edit=row.pk, q=search_q or None) }}"
+                                       class="btn btn-ghost btn-xs">Изменить</a>
+                                    <form method="POST" action="{{ url_for('admin_delete_row', table_name=current_table) }}"
+                                          onsubmit="return confirm('Удалить запись (ID: {{ row.pk }}) из {{ current_table }}?');">
+                                        <input type="hidden" name="pk" value="{{ row.pk }}">
+                                        <button type="submit" class="btn btn-danger btn-xs">Удалить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-card">Записей не найдено.</div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
