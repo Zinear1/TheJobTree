@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение почты — TheJobTree{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <section class="card auth-card animate-card">
+        <div class="verify-head">
+            <div class="verify-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
+            <h1>Подтвердите почту</h1>
+            <p class="subtitle">
+                Мы отправили 6-значный код на
+                <span class="verify-email-badge">{{ email }}</span>
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('verify_email') }}" class="form-grid">
+            <label>
+                <span>Код из письма</span>
+                <input type="text"
+                       name="code"
+                       class="code-input"
+                       inputmode="numeric"
+                       pattern="[0-9]{6}"
+                       maxlength="6"
+                       autocomplete="one-time-code"
+                       placeholder="000000"
+                       required
+                       autofocus>
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-full">Подтвердить и завершить регистрацию</button>
+        </form>
+
+        <div class="verify-footer">
+            <form method="POST" action="{{ url_for('resend_verification_code') }}">
+                <button type="submit" id="resend-btn" class="btn btn-ghost btn-sm"
+                        {% if cooldown_left > 0 %}disabled{% endif %}>
+                    {% if cooldown_left > 0 %}
+                        Отправить код повторно (<span id="cooldown-sec">{{ cooldown_left }}</span> сек)
+                    {% else %}
+                        Отправить код повторно
+                    {% endif %}
+                </button>
+            </form>
+
+            <a href="{{ url_for('register') }}" class="meta-link">Изменить почту</a>
+        </div>
+    </section>
+</div>
+
+<script>
+(function () {
+    const codeInput = document.querySelector('.code-input');
+    if (codeInput) {
+        codeInput.addEventListener('input', () => {
+            codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+        });
+    }
+
+    const secEl = document.getElementById('cooldown-sec');
+    const resendBtn = document.getElementById('resend-btn');
+    if (secEl && resendBtn) {
+        let left = parseInt(secEl.textContent, 10) || 0;
+        const timer = setInterval(() => {
+            left -= 1;
+            if (left <= 0) {
+                clearInterval(timer);
+                resendBtn.disabled = false;
+                resendBtn.textContent = 'Отправить код повторно';
+            } else {
+                secEl.textContent = left;
+            }
+        }, 1000);
+    }
+})();
+</script>
+{% endblock %}

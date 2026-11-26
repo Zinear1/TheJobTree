@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}{{ ad.title }} — TheJobTree{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <div class="page-head">
+        <a href="{{ url_for('index') }}" class="meta-link">← Вернуться в ленту</a>
+    </div>
+
+    <section class="card animate-card">
+        <div class="card-top">
+            <div class="tags-row">
+                <span class="badge badge-category">{{ ad.category_name }}</span>
+                <span class="status-pill status-{{ ad.status|replace(' ', '-') }}">{{ ad.status|upper }}</span>
+                {% if ad.is_remote %}
+                    <span class="badge badge-remote">Удалённо</span>
+                {% endif %}
+            </div>
+            <div class="price price-lg">{{ ad.budget|format_price }} ₽</div>
+        </div>
+
+        <h1 class="detail-title">{{ ad.title }}</h1>
+
+        <div class="meta detail-meta">
+            <span>Город: г. {{ ad.city }}</span>
+            <span>Опубликовано: {{ ad.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% if ad.deadline_date %}
+                <span>Срок: до {{ ad.deadline_date.strftime('%d.%m.%Y') }}</span>
+            {% endif %}
+            <span>Откликов: {{ responses_count }}</span>
+        </div>
+
+        <div class="detail-desc">{{ ad.description }}</div>
+
+        {% if ad_skills %}
+            <div class="detail-skills">
+                <div class="section-label">ТРЕБУЕМЫЕ СОФТ-СКИЛЛЫ И НАВЫКИ</div>
+                <div class="tags-row">
+                    {% for sk in ad_skills %}
+                        <span class="badge {% if sk.skill_type == 'soft' %}badge-skill{% else %}badge-category{% endif %}">
+                            {{ sk.name }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if ad.worker_id %}
+            <div class="assigned-box assigned-box-flex">
+                <div>
+                    Назначенный исполнитель:
+                    <a href="{{ url_for('user_profile', user_id=ad.worker_id) }}" class="meta-link">
+                        <strong>{{ ad.worker_first_name }} {{ ad.worker_last_name }}</strong>
+                    </a>
+                    {% if ad.worker_phone %}
+                        <a href="tel:{{ ad.worker_phone }}" class="phone-badge phone-unlocked">
+                            📞 {{ ad.worker_phone }}
+                        </a>
+                    {% endif %}
+                </div>
+                {% if is_owner and ad.status == 'в работе' %}
+                    <form method="POST" action="{{ url_for('complete_ad', ad_id=ad.ad_id) }}"
+                          onsubmit="return confirm('Подтвердить выполнение работы и закрыть задание?');">
+                        <button type="submit" class="btn btn-success btn-sm">✓ Подтвердить выполнение</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <div class="employer-box">
+            <div class="employer-left">
+                {% if ad.employer_avatar and ad.employer_avatar != '/static/uploads/default_avatar.png' %}
+                    <img src="{{ ad.employer_avatar }}" alt="Аватар" class="avatar-sm">
+                {% else %}
+                    <div class="avatar-sm avatar-initials">
+                        {{ ad.employer_first_name[0] }}{{ ad.employer_last_name[0] }}
+                    </div>
+                {% endif %}
+                <div>
+                    <a href="{{ url_for('user_profile', user_id=ad.employer_id) }}" class="meta-link">
+                        <strong>{{ ad.employer_first_name }} {{ ad.employer_last_name }}</strong>
+                    </a>
+                    <div class="meta">
+                        <span>г. {{ ad.employer_city }}</span>
+                        <span>★ {{ "%.2f"|format(ad.employer_rating) }} ({{ ad.employer_reviews_count }} отз.)</span>
+                        {% if ad.employer_phone %}
+                            <a href="tel:{{ ad.employer_phone }}" class="phone-badge phone-unlocked">📞 {{ ad.employer_phone }}</a>
+                        {% else %}
+                            <span class="phone-badge phone-locked" title="Откроется после утверждения вашего отклика">🔒 Телефон скрыт</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-actions">
+                {% if is_owner %}
+                    <a href="{{ url_for('edit_ad', ad_id=ad.ad_id) }}" class="btn btn-ghost">Редактировать</a>
+                    <form method="POST" action="{{ url_for('delete_ad', ad_id=ad.ad_id) }}"
+                          onsubmit="return confirm('Удалить объявление и все связанные отклики?');">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                {% elif not g.user %}
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Войти, чтобы откликнуться</a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    {% if can_review %}
+        <section class="card review-form-card animate-card">
+            <h2 class="card-title">Оставить отзыв о {{ review_target_name }}</h2>
+            <p class="subtitle">Сделка завершена — оцените сотрудничество по 5-балльной шкале.</p>
+
+            <form method="POST" action="{{ url_for('leave_review', ad_id=ad.ad_id) }}" class="form-grid">
+                <div>
+                    <div class="section-label">ВАША ОЦЕНКА</div>
+                    <div class="star-rating">
+                        <input type="radio" id="star5" name="rating" value="5" required checked>
+                        <label for="star5" title="5 из 5">★</label>
+                        <input type="radio" id="star4" name="rating" value="4">
+                        <label for="star4" title="4 из 5">★</label>
+                        <input type="radio" id="star3" name="rating" value="3">
+                        <label for="star3" title="3 из 5">★</label>
+                        <input type="radio" id="star2" name="rating" value="2">
+                        <label for="star2" title="2 из 5">★</label>
+                        <input type="radio" id="star1" name="rating" value="1">
+                        <label for="star1" title="1 из 5">★</label>
+                    </div>
+                </div>
+
+                <label>
+                    <span>Комментарий *</span>
+                    <textarea name="comment" rows="3" required
+                              placeholder="Как прошла работа? Соблюдены ли сроки, качество и договорённости?"></textarea>
+                </label>
+
+                <div class="card-actions">
+                    <button type="submit" class="btn btn-primary">Опубликовать отзыв</button>
+                </div>
+            </form>
+        </section>
+    {% elif already_reviewed %}
+        <div class="card review-done-note animate-card">
+            ✓ Вы уже оставили отзыв по этой сделке. Спасибо за вклад в репутацию платформы!
+        </div>
+    {% endif %}
+
+    {% if ad_reviews %}
+        <div class="section-label">ОТЗЫВЫ ПО ЭТОЙ СДЕЛКЕ ({{ ad_reviews|length }})</div>
+        <div class="cards-list">
+            {% for rev in ad_reviews %}
+                <article class="card animate-card">
+                    <div class="card-top">
+                        <div>
+                            <a href="{{ url_for('user_profile', user_id=rev.author_id) }}" class="meta-link">
+                                <strong>{{ rev.author_first_name }} {{ rev.author_last_name }}</strong>
+                            </a>
+                            <span class="meta-inline">→ о</span>
+                            <a href="{{ url_for('user_profile', user_id=rev.target_id) }}" class="meta-link">
+                                <strong>{{ rev.target_first_name }} {{ rev.target_last_name }}</strong>
+                            </a>
+                        </div>
+                        <span class="rating-pill">
+                            {{ "★" * rev.rating }}{{ "☆" * (5 - rev.rating) }} ({{ rev.rating }}/5)
+                        </span>
+                    </div>
+                    <p class="card-desc">{{ rev.comment }}</p>
+                    <div class="meta">{{ rev.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if g.user and not is_owner %}
+        <section class="card animate-card">
+            {% if my_response %}
+                <div class="card-top">
+                    <div>
+                        <h2 class="card-title">Вы уже откликнулись на это объявление</h2>
+                        <div class="meta">
+                            <span>Статус отклика: <strong>{{ my_response.status }}</strong></span>
+                            {% if my_response.proposed_budget %}
+                                <span>Ваша цена: {{ my_response.proposed_budget|format_price }} ₽</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('chat_detail', chat_id=my_response.chat_id) }}" class="btn btn-primary">
+                        Открыть чат с заказчиком
+                    </a>
+                </div>
+                <p class="card-desc">«{{ my_response.cover_letter }}»</p>
+            {% elif ad.status == 'активно' %}
+                <h2 class="card-title">Откликнуться на объявление</h2>
+                <p class="subtitle">После отправки отклика автоматически откроется чат. Телефоны откроются после утверждения.</p>
+                <form method="POST" action="{{ url_for('respond_to_ad', ad_id=ad.ad_id) }}" class="form-grid">
+                    <label>
+                        <span>Ваша цена (₽, можно указать любую сумму)</span>
+                        <input type="text" inputmode="decimal" name="proposed_budget" autocomplete="off"
+                               value="{{ ad.budget|clean_price }}" placeholder="Например: {{ ad.budget|clean_price }}">
+                    </label>
+                    <label>
+                        <span>Сопроводительное сообщение *</span>
+                        <textarea name="cover_letter" rows="4" required
+                                  placeholder="Расскажите о своём опыте, когда готовы приступить и какие детали хотите уточнить..."></textarea>
+                    </label>
+                    <div class="card-actions">
+                        <button type="submit" class="btn btn-primary">Откликнуться и открыть чат</button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="subtitle">Приём откликов по этому объявлению закрыт (статус: {{ ad.status }}).</p>
+            {% endif %}
+        </section>
+    {% endif %}
+
+    {% if is_owner %}
+        {% if recommended_candidate %}
+            <section class="ai-insight animate-card">
+                <div class="ai-dot">✦</div>
+                <div>
+                    <strong>Ассистент TheJobTree:</strong>
+                    На ваше объявление поступило откликов: {{ incoming_responses|length }}.
+                    Наиболее подходящий кандидат —
+                    <a href="{{ url_for('user_profile', user_id=recommended_candidate.applicant_id) }}" class="meta-link">
+                        <strong>{{ recommended_candidate.first_name }} {{ recommended_candidate.last_name }}</strong>
+                    </a>
+                    (★ {{ "%.2f"|format(recommended_candidate.avg_rating) }}, г. {{ recommended_candidate.city }},
+                    отзывов: {{ recommended_candidate.reviews_count }}).
+                </div>
+            </section>
+        {% endif %}
+
+        <div class="section-label">ПОСТУПИВШИЕ ОТКЛИКИ ({{ incoming_responses|length }})</div>
+
+        {% if incoming_responses %}
+            <div class="cards-list">
+                {% for resp in incoming_responses %}
+                    <article class="card animate-card">
+                        <div class="card-top">
+                            <div class="employer-left">
+                                {% if resp.avatar_url and resp.avatar_url != '/static/uploads/default_avatar.png' %}
+                                    <img src="{{ resp.avatar_url }}" alt="Аватар" class="avatar-sm">
+                                {% else %}
+                                    <div class="avatar-sm avatar-initials">
+                                        {{ resp.first_name[0] }}{{ resp.last_name[0] }}
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <a href="{{ url_for('user_profile', user_id=resp.applicant_id) }}" class="meta-link">
+                                        <strong>{{ resp.first_name }} {{ resp.last_name }}</strong>
+                                    </a>
+                                    <div class="meta">
+                                        <span>★ {{ "%.2f"|format(resp.avg_rating) }} / 5.0 · {{ resp.reviews_count }} отз.</span>
+                                        <span>г. {{ resp.city }}</span>
+                                        {% if resp.phone %}
+                                            <a href="tel:{{ resp.phone }}" class="phone-badge phone-unlocked">📞 {{ resp.phone }}</a>
+                                        {% else %}
+                                            <span class="phone-badge phone-locked">🔒 Телефон скрыт до утверждения</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="resp-right">
+                                <span class="status-pill status-{{ resp.status }}">{{ resp.status|upper }}</span>
+                                {% if resp.proposed_budget %}
+                                    <div class="price">{{ resp.proposed_budget|format_price }} ₽</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <p class="card-desc">«{{ resp.cover_letter }}»</p>
+
+                        <div class="card-footer">
+                            <div class="meta">{{ resp.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                            <div class="card-actions">
+                                <a href="{{ url_for('chat_detail', chat_id=resp.chat_id) }}" class="btn btn-ghost">
+                                    Открыть чат
+                                </a>
+                                {% if ad.status == 'активно' and resp.status == 'ожидает' %}
+                                    <form method="POST" action="{{ url_for('reject_response_route', response_id=resp.response_id) }}">
+                                        <button type="submit" class="btn btn-danger">Отклонить</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('accept_response_route', response_id=resp.response_id) }}">
+                                        <button type="submit" class="btn btn-primary">✓ Утвердить исполнителя</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card empty-card">На это объявление пока никто не откликнулся.</div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Чаты — TheJobTree{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <div class="hero">
+        <h1>Чаты</h1>
+        <p class="subtitle">Обсуждайте детали подработки, сроки и оплату напрямую с собеседником.</p>
+    </div>
+
+    {% if chats %}
+        <div class="cards-list">
+            {% for ch in chats %}
+                <a href="{{ url_for('chat_detail', chat_id=ch.chat_id) }}" class="card chat-row">
+                    <div class="chat-row-left">
+                        {% if ch.other_avatar and ch.other_avatar != '/static/uploads/default_avatar.png' %}
+                            <img src="{{ ch.other_avatar }}" alt="Аватар" class="avatar-md">
+                        {% else %}
+                            <div class="avatar-md avatar-initials">
+                                {{ ch.other_first_name[0] }}{{ ch.other_last_name[0] }}
+                            </div>
+                        {% endif %}
+
+                        <div class="chat-row-info">
+                            <div class="chat-row-head">
+                                <strong>{{ ch.other_first_name }} {{ ch.other_last_name }}</strong>
+                                <span class="badge badge-skill">
+                                    {% if ch.employer_id == g.user.user_id %}Соискатель{% else %}Работодатель{% endif %}
+                                </span>
+                                <span class="status-pill status-{{ ch.response_status }}">{{ ch.response_status|upper }}</span>
+                            </div>
+                            <div class="chat-ad-ref">Объявление: {{ ch.ad_title }}</div>
+                            <div class="chat-preview">
+                                {% if ch.last_message_body %}
+                                    {{ ch.last_message_body[:110] }}{% if ch.last_message_body|length > 110 %}...{% endif %}
+                                {% else %}
+                                    Чат открыт — напишите первое сообщение
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-row-right">
+                        {% if ch.last_message_time %}
+                            <span class="meta">{{ ch.last_message_time.strftime('%d.%m %H:%M') }}</span>
+                        {% endif %}
+                        {% if ch.unread_count > 0 %}
+                            <span class="unread-badge">{{ ch.unread_count }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card empty-card">
+            У вас пока нет активных чатов. Откликнитесь на объявление или дождитесь откликов на свои задачи.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

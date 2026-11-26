@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}TheJobTree — Лента объявлений{% endblock %}
+
+{% block content %}
+<div class="feed-container">
+    <div class="hero">
+        <h1>
+            <span id="greeting-text">{{ greeting }}</span>{% if g.user %},
+                <span class="gradient-text">{{ g.user.first_name }}</span>
+            {% else %}!
+                Найди подработку в <span class="gradient-text">TheJobTree</span>
+            {% endif %}
+        </h1>
+        {% if g.user %}
+            <p class="subtitle">Актуальная подработка и разовые задания в г. <strong>{{ g.selected_city }}</strong>.</p>
+        {% else %}
+            <p class="subtitle">Показаны активные объявления в г. <strong>{{ g.selected_city }}</strong>. Выберите другой город в шапке при необходимости.</p>
+        {% endif %}
+    </div>
+
+    <form method="GET" action="{{ url_for('index') }}" class="card filter-panel">
+        <div class="filter-grid">
+            <label>
+                <span>Категория</span>
+                <select name="category_id">
+                    <option value="">Все категории</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.category_id }}" {% if category_id == cat.category_id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label>
+                <span>Бюджет от (₽)</span>
+                <input type="text" inputmode="decimal" name="min_budget"
+                       value="{{ min_budget_str }}" placeholder="Любая сумма" autocomplete="off">
+            </label>
+
+            <label>
+                <span>Бюджет до (₽)</span>
+                <input type="text" inputmode="decimal" name="max_budget"
+                       value="{{ max_budget_str }}" placeholder="Любая сумма" autocomplete="off">
+            </label>
+
+            <label class="checkbox-inline">
+                <input type="checkbox" name="is_remote" value="1" {% if only_remote %}checked{% endif %}>
+                <span>Только удалённо</span>
+            </label>
+        </div>
+
+        <div class="soft-skills-filter">
+            <div class="section-label">ФИЛЬТР ПО СОФТ-СКИЛЛАМ (можно выбрать несколько)</div>
+            <div class="chips">
+                {% for skill in soft_skills %}
+                    <label class="chip-check">
+                        <input type="checkbox" name="skill_id" value="{{ skill.skill_id }}"
+                               {% if skill.skill_id in selected_skills %}checked{% endif %}>
+                        <span>{{ skill.name }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        {% if sort_by %}<input type="hidden" name="sort" value="{{ sort_by }}">{% endif %}
+
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">Применить фильтры</button>
+            <a href="{{ url_for('index') }}" class="btn btn-ghost">Сбросить</a>
+        </div>
+    </form>
+
+    <!-- Отдельное окно сортировки ниже фильтра -->
+    <section class="card sort-panel animate-card">
+        <span class="sort-title">Сортировка:</span>
+        <div class="sort-pills">
+            {% for opt in sort_options %}
+                <a href="{{ opt.url }}" class="sort-pill {% if opt.active %}active{% endif %}">
+                    <span>{{ opt.label }}</span>
+                    {% if opt.arrow %}
+                        <span class="sort-arrow">{{ opt.arrow }}</span>
+                    {% endif %}
+                    {% if opt.hint %}
+                        <span class="sort-hint">({{ opt.hint }})</span>
+                    {% endif %}
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="section-label">АКТИВНЫЕ ОБЪЯВЛЕНИЯ В Г. {{ g.selected_city|upper }} ({{ ads|length }})</div>
+
+    {% if ads %}
+        <div class="cards-list">
+            {% for ad in ads %}
+                <article class="card ad-card animate-card">
+                    <div class="card-top">
+                        <div class="tags-row">
+                            <span class="badge badge-category">{{ ad.category_name }}</span>
+                            {% if ad.is_remote %}
+                                <span class="badge badge-remote">Удалённо</span>
+                            {% endif %}
+                            {% for sk in ad.skills %}
+                                <span class="badge badge-skill">{{ sk }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="price">{{ ad.budget|format_price }} ₽</div>
+                    </div>
+
+                    <h2 class="card-title">
+                        <a href="{{ url_for('ad_detail', ad_id=ad.ad_id) }}" class="card-title-link">{{ ad.title }}</a>
+                    </h2>
+                    <p class="card-desc">{{ ad.description }}</p>
+
+                    <div class="card-footer">
+                        <div class="meta">
+                            <span>г. {{ ad.city }}</span>
+                            {% if ad.deadline_date %}
+                                <span>Срок: {{ ad.deadline_date.strftime('%d.%m.%Y') }}</span>
+                            {% endif %}
+                            <a href="{{ url_for('user_profile', user_id=ad.employer_id) }}" class="meta-link">
+                                Заказчик: {{ ad.employer_first_name }} {{ ad.employer_last_name[0] }}.
+                                (★ {{ "%.1f"|format(ad.employer_rating) }})
+                            </a>
+                        </div>
+                        <div class="card-actions">
+                            <a href="{{ url_for('ad_detail', ad_id=ad.ad_id) }}" class="btn btn-primary">Подробнее</a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card empty-card">
+            В городе <strong>{{ g.selected_city }}</strong> по выбранным фильтрам объявлений пока нет.
+            <a href="{{ url_for('index') }}" class="meta-link">Сбросить фильтры</a>
+        </div>
+    {% endif %}
+</div>
+
+<form method="GET" action="{{ url_for('index') }}" class="prompt-bar">
+    {% if category_id %}<input type="hidden" name="category_id" value="{{ category_id }}">{% endif %}
+    {% if min_budget_str %}<input type="hidden" name="min_budget" value="{{ min_budget_str }}">{% endif %}
+    {% if max_budget_str %}<input type="hidden" name="max_budget" value="{{ max_budget_str }}">{% endif %}
+    {% if only_remote %}<input type="hidden" name="is_remote" value="1">{% endif %}
+    {% if sort_by %}<input type="hidden" name="sort" value="{{ sort_by }}">{% endif %}
+    {% for sid in selected_skills %}<input type="hidden" name="skill_id" value="{{ sid }}">{% endfor %}
+
+    <input type="text" name="q" value="{{ search_query }}"
+           placeholder="Введите запрос (например: курьер, лендинг, щиток)...">
+    <button type="submit" class="send-btn">Найти</button>
+</form>
+
+<script>
+(function () {
+    function updateGreeting() {
+        const el = document.getElementById('greeting-text');
+        if (!el) return;
+        const h = new Date().getHours();
+        let text = 'Доброй ночи';
+        if (h >= 5 && h < 12) text = 'Доброе утро';
+        else if (h >= 12 && h < 18) text = 'Добрый день';
+        else if (h >= 18 && h < 23) text = 'Добрый вечер';
+        el.textContent = text;
+    }
+    updateGreeting();
+    setInterval(updateGreeting, 60000);
+})();
+</script>
+{% endblock %}
